@@ -19,10 +19,14 @@ data "git_repository" "example" {
 
 output "example" {
   value = {
-    path    = data.git_repository.example.path
-    branch  = data.git_repository.example.branch
-    summary = data.git_repository.example.summary
-    semver  = data.git_repository.example.semver
+    path      = data.git_repository.example.path
+    branch    = data.git_repository.example.branch
+    tag       = data.git_repository.example.tag
+    is_dirty  = data.git_repository.example.is_dirty
+    is_tag    = data.git_repository.example.is_tag
+    is_branch = data.git_repository.example.is_branch
+    summary   = data.git_repository.example.summary
+    semver    = data.git_repository.example.semver
   }
 }
 
@@ -50,7 +54,10 @@ terraform {
 ### Read-Only
 
 - `branch` (String) Branch Name
+- `is_dirty` (Boolean) Whether or not the repository is in a dirty state
+- `is_tag` (Boolean) Whether or not the current reference is a tag
 - `semver` (String) Git Summary in SEMVER format
 - `summary` (String) Git Summary
+- `tag` (String) Current Tag of Repository
 
 

@@ -30,8 +30,12 @@ type GitRepository struct {
 // GitRepositoryModel describes the data source data model.
 type GitRepositoryModel struct {
 	Path              types.String `tfsdk:"path"`
-	Branch            types.String `tfsdk:"branch"`
 	Summary           types.String `tfsdk:"summary"`
+	Branch            types.String `tfsdk:"branch"`
+	Tag               types.String `tfsdk:"tag"`
+	IsDirty           types.Bool   `tfsdk:"is_dirty"`
+	IsTag             types.Bool   `tfsdk:"is_tag"`
+	IsBranch          types.Bool   `tfsdk:"is_branch"`
 	Semver            types.String `tfsdk:"semver"`
 	SemverFallbackTag types.String `tfsdk:"semver_fallback_tag"`
 }
@@ -50,16 +54,28 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 				MarkdownDescription: "Path to Git Repository",
 				Required:            true,
 			},
+			"summary": schema.StringAttribute{
+				MarkdownDescription: "Git Summary",
+				Computed:            true,
+			},
 			"branch": schema.StringAttribute{
 				MarkdownDescription: "Branch Name",
 				Computed:            true,
 			},
-			"semver": schema.StringAttribute{
-				MarkdownDescription: "Git Summary in SEMVER format",
+			"tag": schema.StringAttribute{
+				MarkdownDescription: "Current Tag of Repository",
 				Computed:            true,
 			},
-			"summary": schema.StringAttribute{
-				MarkdownDescription: "Git Summary",
+			"is_dirty": schema.BoolAttribute{
+				MarkdownDescription: "Whether or not the repository is in a dirty state",
+				Computed:            true,
+			},
+			"is_tag": schema.BoolAttribute{
+				MarkdownDescription: "Whether or not the current reference is a tag",
+				Computed:            true,
+			},
+			"semver": schema.StringAttribute{
+				MarkdownDescription: "Git Summary in SEMVER format",
 				Computed:            true,
 			},
 			"semver_fallback_tag": schema.StringAttribute{
@@ -117,6 +133,10 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 	}
 
 	tagName, counter, headHash, err := gitutils.Describe(*repo)
+	if err != nil {
+		resp.Diagnostics.AddError("Git Describe Error", err.Error())
+		return
+	}
 
 	result, err := gitutils.GenerateVersion(*tagName, *counter, *headHash, time.Now(), gitutils.GenerateVersionOptions{
 		FallbackTagName: data.SemverFallbackTag.ValueString(),
@@ -126,9 +146,20 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
-	worktree, _ := repo.Worktree()
-	status, _ := worktree.Status()
+	worktree, err := repo.Worktree()
+	if err != nil {
+		resp.Diagnostics.AddError("Worktree Read Error", err.Error())
+		return
+	}
+
+	status, err := worktree.Status()
+	if err != nil {
+		resp.Diagnostics.AddError("Worktree Status Error", err.Error())
+		return
+	}
+
 	dirty := !status.IsClean()
+	isTag := head.Name().IsTag()
 
 	if tagName != nil && toString(tagName) != "" {
 		data.Summary = types.StringValue(fmt.Sprintf("%s-%d-g%s", toString(tagName), toInt(counter), toString(headHash)[0:7]))
@@ -142,6 +173,9 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	data.Semver = types.StringValue(*result)
 	data.Branch = types.StringValue(head.Name().String())
+	data.IsDirty = types.BoolValue(dirty)
+	data.IsTag = types.BoolValue(isTag)
+	data.IsBranch = types.BoolValue(head.Name().IsBranch())
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
