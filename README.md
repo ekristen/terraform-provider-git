@@ -22,8 +22,8 @@ Once you've written your provider, you'll want to [publish it on the Terraform R
 ## Building The Provider
 
 1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+2. Enter the repository directory
+3. Build the provider using the Go `install` command:
 
 ```shell
 go install
