@@ -66,6 +66,10 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 				MarkdownDescription: "Current Tag of Repository",
 				Computed:            true,
 			},
+			"is_branch": schema.BoolAttribute{
+				MarkdownDescription: "Whether or not the current reference is a branch",
+				Computed:            true,
+			},
 			"is_dirty": schema.BoolAttribute{
 				MarkdownDescription: "Whether or not the repository is in a dirty state",
 				Computed:            true,
