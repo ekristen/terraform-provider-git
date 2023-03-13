@@ -38,3 +38,4 @@ website/vendor
 *.tfstate
 *.hcl.lock
 *.terraformrc*
+Archive.zip

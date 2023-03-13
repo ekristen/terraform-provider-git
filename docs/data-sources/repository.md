@@ -54,6 +54,8 @@ terraform {
 ### Read-Only
 
 - `branch` (String) Branch Name
+- `id` (String) id
+- `is_branch` (Boolean) Whether or not the current reference is a branch
 - `is_dirty` (Boolean) Whether or not the repository is in a dirty state
 - `is_tag` (Boolean) Whether or not the current reference is a tag
 - `semver` (String) Git Summary in SEMVER format

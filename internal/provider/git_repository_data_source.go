@@ -29,6 +29,7 @@ type GitRepository struct {
 
 // GitRepositoryModel describes the data source data model.
 type GitRepositoryModel struct {
+	Id                types.String `tfsdk:"id"`
 	Path              types.String `tfsdk:"path"`
 	Summary           types.String `tfsdk:"summary"`
 	Branch            types.String `tfsdk:"branch"`
@@ -50,6 +51,10 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 		MarkdownDescription: "Git Repository data source",
 
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "id",
+				Computed:            true,
+			},
 			"path": schema.StringAttribute{
 				MarkdownDescription: "Path to Git Repository",
 				Required:            true,
@@ -175,6 +180,7 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		data.Summary = types.StringValue(fmt.Sprintf("%s-dirty", data.Summary.ValueString()))
 	}
 
+	data.Id = types.StringValue(data.Path.ValueString())
 	data.Semver = types.StringValue(*result)
 	data.Branch = types.StringValue(head.Name().String())
 	data.IsDirty = types.BoolValue(dirty)
