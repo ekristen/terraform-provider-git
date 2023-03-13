@@ -1,18 +1,22 @@
 package provider
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const testAccExampleDataSourceConfig1 = `
+func testAccGitRepositoryDataSourceConfigBasic(path string) string {
+	return fmt.Sprintf(`
 data "git_repository" "test" {
-  path = "./testdata/no-tags"
+  path = %[1]q
 }
-`
+`, path)
+}
 
 func TestAccGitRepositoryDataSource1(t *testing.T) {
+	path := "./testdata/no-tags"
 	resource.Test(t, resource.TestCase{
 		IsUnitTest:               true,
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -20,9 +24,9 @@ func TestAccGitRepositoryDataSource1(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Read testing
 			{
-				Config: testAccExampleDataSourceConfig1,
+				Config: testAccGitRepositoryDataSourceConfigBasic(path),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.git_repository.test", "id", "./testdata/no-tags"),
+					resource.TestCheckResourceAttr("data.git_repository.test", "id", path),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_tag", "false"),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_dirty", "false"),
 				),
@@ -30,14 +34,9 @@ func TestAccGitRepositoryDataSource1(t *testing.T) {
 		},
 	})
 }
-
-const testAccExampleDataSourceConfig2 = `
-data "git_repository" "test" {
-  path = "./testdata/tagged"
-}
-`
 
 func TestAccGitRepositoryDataSource2(t *testing.T) {
+	path := "./testdata/tagged"
 	resource.Test(t, resource.TestCase{
 		IsUnitTest:               true,
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -45,24 +44,20 @@ func TestAccGitRepositoryDataSource2(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Read testing
 			{
-				Config: testAccExampleDataSourceConfig2,
+				Config: testAccGitRepositoryDataSourceConfigBasic(path),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.git_repository.test", "id", "./testdata/tagged"),
+					resource.TestCheckResourceAttr("data.git_repository.test", "id", path),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_tag", "false"),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_dirty", "false"),
+					resource.TestCheckResourceAttr("data.git_repository.test", "semver", "v1.0.0"),
 				),
 			},
 		},
 	})
 }
 
-const testAccExampleDataSourceConfig3 = `
-data "git_repository" "test" {
-  path = "./testdata/tagged-extra-commits"
-}
-`
-
 func TestAccGitRepositoryDataSource3(t *testing.T) {
+	path := "./testdata/tagged-extra-commits"
 	resource.Test(t, resource.TestCase{
 		IsUnitTest:               true,
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -70,11 +65,12 @@ func TestAccGitRepositoryDataSource3(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Read testing
 			{
-				Config: testAccExampleDataSourceConfig3,
+				Config: testAccGitRepositoryDataSourceConfigBasic(path),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.git_repository.test", "id", "./testdata/tagged-extra-commits"),
+					resource.TestCheckResourceAttr("data.git_repository.test", "id", path),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_tag", "false"),
 					resource.TestCheckResourceAttr("data.git_repository.test", "is_dirty", "false"),
+					resource.TestCheckResourceAttr("data.git_repository.test", "semver", "v1.0.0-1.g21e4385"),
 				),
 			},
 		},

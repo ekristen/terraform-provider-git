@@ -167,6 +167,10 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		return
 	}
 
+	tflog.Trace(ctx, fmt.Sprintf("head: %s", head.Name().String()))
+	tflog.Trace(ctx, fmt.Sprintf("is_tag: %t", head.Name().IsTag()))
+	tflog.Trace(ctx, fmt.Sprintf("is_branch: %t", head.Name().IsBranch()))
+
 	dirty := !status.IsClean()
 	isTag := head.Name().IsTag()
 
