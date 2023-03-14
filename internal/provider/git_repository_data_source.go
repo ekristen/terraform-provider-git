@@ -217,6 +217,7 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		data.Summary = types.StringValue(fmt.Sprintf("%s-dirty", data.Summary.ValueString()))
 	}
 
+	data.HasTag = types.BoolValue(false) // default
 	iter, err := repo.Tags()
 	if err := iter.ForEach(func(ref *plumbing.Reference) error {
 		obj, _ := repo.TagObject(ref.Hash())
