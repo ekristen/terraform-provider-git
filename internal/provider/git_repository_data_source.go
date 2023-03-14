@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"net/http"
 	"time"
 
@@ -29,16 +30,21 @@ type GitRepository struct {
 
 // GitRepositoryModel describes the data source data model.
 type GitRepositoryModel struct {
-	Id                types.String `tfsdk:"id"`
-	Path              types.String `tfsdk:"path"`
-	Summary           types.String `tfsdk:"summary"`
-	Branch            types.String `tfsdk:"branch"`
-	Tag               types.String `tfsdk:"tag"`
-	IsDirty           types.Bool   `tfsdk:"is_dirty"`
-	IsTag             types.Bool   `tfsdk:"is_tag"`
-	IsBranch          types.Bool   `tfsdk:"is_branch"`
-	Semver            types.String `tfsdk:"semver"`
-	SemverFallbackTag types.String `tfsdk:"semver_fallback_tag"`
+	Id                   types.String `tfsdk:"id"`
+	Path                 types.String `tfsdk:"path"`
+	Reference            types.String `tfsdk:"ref"`
+	ReferenceShort       types.String `tfsdk:"ref_short"`
+	Summary              types.String `tfsdk:"summary"`
+	Branch               types.String `tfsdk:"branch"`
+	Tag                  types.String `tfsdk:"tag"`
+	IsDirty              types.Bool   `tfsdk:"is_dirty"`
+	IsTag                types.Bool   `tfsdk:"is_tag"`
+	IsBranch             types.Bool   `tfsdk:"is_branch"`
+	HasTag               types.Bool   `tfsdk:"has_tag"`
+	CommitCount          types.Int64  `tfsdk:"commit_count"`
+	Semver               types.String `tfsdk:"semver"`
+	SemverFallbackTag    types.String `tfsdk:"semver_fallback_tag"`
+	ReferenceShortLength types.Int64  `tfsdk:"ref_short_length"`
 }
 
 func (d *GitRepository) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -71,6 +77,18 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 				MarkdownDescription: "Current Tag of Repository",
 				Computed:            true,
 			},
+			"ref": schema.StringAttribute{
+				MarkdownDescription: "Current reference of the repository",
+				Computed:            true,
+			},
+			"ref_short": schema.StringAttribute{
+				MarkdownDescription: "Short version of the current reference",
+				Computed:            true,
+			},
+			"ref_short_length": schema.Int64Attribute{
+				MarkdownDescription: "Length of the short version of the current reference (default: 7)",
+				Optional:            true,
+			},
 			"is_branch": schema.BoolAttribute{
 				MarkdownDescription: "Whether or not the current reference is a branch",
 				Computed:            true,
@@ -81,6 +99,14 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 			},
 			"is_tag": schema.BoolAttribute{
 				MarkdownDescription: "Whether or not the current reference is a tag",
+				Computed:            true,
+			},
+			"has_tag": schema.BoolAttribute{
+				MarkdownDescription: "Whether or not the current reference has been tagged",
+				Computed:            true,
+			},
+			"commit_count": schema.Int64Attribute{
+				MarkdownDescription: "",
 				Computed:            true,
 			},
 			"semver": schema.StringAttribute{
@@ -128,6 +154,9 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 	if data.SemverFallbackTag.ValueString() == "" {
 		data.SemverFallbackTag = types.StringValue("v0.0.0")
 	}
+	if data.ReferenceShortLength.ValueInt64() == 0 {
+		data.ReferenceShortLength = types.Int64Value(7)
+	}
 
 	repo, err := git.PlainOpen(data.Path.ValueString())
 	if err != nil {
@@ -146,6 +175,10 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		resp.Diagnostics.AddError("Git Describe Error", err.Error())
 		return
 	}
+
+	data.Reference = types.StringValue(head.Hash().String())
+	data.ReferenceShort = types.StringValue(head.Hash().String()[0:data.ReferenceShortLength.ValueInt64()])
+	data.CommitCount = types.Int64Value(int64(*counter))
 
 	result, err := gitutils.GenerateVersion(*tagName, *counter, *headHash, time.Now(), gitutils.GenerateVersionOptions{
 		FallbackTagName: data.SemverFallbackTag.ValueString(),
@@ -182,6 +215,18 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	if dirty {
 		data.Summary = types.StringValue(fmt.Sprintf("%s-dirty", data.Summary.ValueString()))
+	}
+
+	iter, err := repo.Tags()
+	if err := iter.ForEach(func(ref *plumbing.Reference) error {
+		obj, _ := repo.TagObject(ref.Hash())
+		if obj.Target.String() == head.Hash().String() {
+			data.HasTag = types.BoolValue(true)
+		}
+		return nil
+	}); err != nil {
+		resp.Diagnostics.AddError("Git Error", err.Error())
+		return
 	}
 
 	data.Id = types.StringValue(data.Path.ValueString())
