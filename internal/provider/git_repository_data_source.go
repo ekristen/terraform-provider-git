@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -227,9 +228,14 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		tflog.Trace(ctx, fmt.Sprintf("ref: %s", ref.Hash().String()))
 
 		obj, err := repo.TagObject(ref.Hash())
-		if err != nil && err != plumbing.ErrObjectNotFound {
+		if err != nil && !errors.Is(err, plumbing.ErrObjectNotFound) {
 			return err
 		}
+
+		if obj == nil {
+			return nil
+		}
+
 		if obj.Target.String() == head.Hash().String() {
 			data.HasTag = types.BoolValue(true)
 		}
