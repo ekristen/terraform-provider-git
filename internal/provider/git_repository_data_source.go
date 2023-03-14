@@ -160,19 +160,19 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 
 	repo, err := git.PlainOpen(data.Path.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Git Error", err.Error())
+		resp.Diagnostics.AddError("unable to open git repository", err.Error())
 		return
 	}
 
 	head, err := repo.Head()
 	if err != nil {
-		resp.Diagnostics.AddError("Git Error", err.Error())
+		resp.Diagnostics.AddError("unable to read git head reference", err.Error())
 		return
 	}
 
 	tagName, counter, headHash, err := gitutils.Describe(*repo)
 	if err != nil {
-		resp.Diagnostics.AddError("Git Describe Error", err.Error())
+		resp.Diagnostics.AddError("unable to run git describe", err.Error())
 		return
 	}
 
@@ -184,19 +184,19 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		FallbackTagName: data.SemverFallbackTag.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("Generate Version Error", err.Error())
+		resp.Diagnostics.AddError("unable to generate version", err.Error())
 		return
 	}
 
 	worktree, err := repo.Worktree()
 	if err != nil {
-		resp.Diagnostics.AddError("Worktree Read Error", err.Error())
+		resp.Diagnostics.AddError("unable to read worktree", err.Error())
 		return
 	}
 
 	status, err := worktree.Status()
 	if err != nil {
-		resp.Diagnostics.AddError("Worktree Status Error", err.Error())
+		resp.Diagnostics.AddError("unable to get worktree status", err.Error())
 		return
 	}
 
@@ -220,13 +220,22 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 	data.HasTag = types.BoolValue(false) // default
 	iter, err := repo.Tags()
 	if err := iter.ForEach(func(ref *plumbing.Reference) error {
-		obj, _ := repo.TagObject(ref.Hash())
+		if ref == nil {
+			return nil
+		}
+
+		tflog.Trace(ctx, fmt.Sprintf("ref: %s", ref.Hash().String()))
+
+		obj, err := repo.TagObject(ref.Hash())
+		if err != nil && err != plumbing.ErrObjectNotFound {
+			return err
+		}
 		if obj.Target.String() == head.Hash().String() {
 			data.HasTag = types.BoolValue(true)
 		}
 		return nil
 	}); err != nil {
-		resp.Diagnostics.AddError("Git Error", err.Error())
+		resp.Diagnostics.AddError("unable to find tag for reference", err.Error())
 		return
 	}
 

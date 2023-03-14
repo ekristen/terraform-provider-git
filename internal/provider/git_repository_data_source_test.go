@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -144,6 +145,29 @@ func TestAccGitRepositoryDataSource4(t *testing.T) {
 					resource.TestCheckResourceAttr("data.git_repository.test", "semver", "v1.0.0"),
 					resource.TestCheckResourceAttr("data.git_repository.test", "ref", hash.String()),
 				),
+			},
+		},
+	})
+}
+
+func TestAccGitRepositoryDataSource5(t *testing.T) {
+	tempDir, err := os.MkdirTemp(os.TempDir(), "terraform-provider-git-")
+	assert.NoError(t, err)
+	//noinspection GoUnhandledErrorResult
+	defer os.RemoveAll(tempDir)
+
+	reg, err := regexp.Compile("unable to open git repository")
+	assert.NoError(t, err)
+
+	resource.Test(t, resource.TestCase{
+		IsUnitTest:               true,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Read testing
+			{
+				Config:      testAccGitRepositoryDataSourceConfigBasic(tempDir),
+				ExpectError: reg,
 			},
 		},
 	})
