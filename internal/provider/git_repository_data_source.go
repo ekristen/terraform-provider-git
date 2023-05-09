@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -41,6 +40,7 @@ type GitRepositoryModel struct {
 	IsDirty              types.Bool   `tfsdk:"is_dirty"`
 	IsTag                types.Bool   `tfsdk:"is_tag"`
 	IsBranch             types.Bool   `tfsdk:"is_branch"`
+	IsRemote             types.Bool   `tfsdk:"is_remote"`
 	HasTag               types.Bool   `tfsdk:"has_tag"`
 	CommitCount          types.Int64  `tfsdk:"commit_count"`
 	Semver               types.String `tfsdk:"semver"`
@@ -100,6 +100,10 @@ func (d *GitRepository) Schema(ctx context.Context, req datasource.SchemaRequest
 			},
 			"is_tag": schema.BoolAttribute{
 				MarkdownDescription: "Whether or not the current reference is a tag",
+				Computed:            true,
+			},
+			"is_remote": schema.BoolAttribute{
+				MarkdownDescription: "Is the reference a remote",
 				Computed:            true,
 			},
 			"has_tag": schema.BoolAttribute{
@@ -206,7 +210,6 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 	tflog.Trace(ctx, fmt.Sprintf("is_branch: %t", head.Name().IsBranch()))
 
 	dirty := !status.IsClean()
-	isTag := head.Name().IsTag()
 
 	if tagName != nil && toString(tagName) != "" {
 		data.Summary = types.StringValue(fmt.Sprintf("%s-%d-g%s", toString(tagName), toInt(counter), toString(headHash)[0:7]))
@@ -218,27 +221,24 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 		data.Summary = types.StringValue(fmt.Sprintf("%s-dirty", data.Summary.ValueString()))
 	}
 
+	tflog.Trace(ctx, fmt.Sprintf("head_ref: %s", head.Hash().String()))
+
 	data.HasTag = types.BoolValue(false) // default
+
 	iter, err := repo.Tags()
 	if err := iter.ForEach(func(ref *plumbing.Reference) error {
 		if ref == nil {
 			return nil
 		}
 
-		tflog.Trace(ctx, fmt.Sprintf("ref: %s", ref.Hash().String()))
+		tflog.Trace(ctx, fmt.Sprintf("tag_ref: %s", ref.Hash().String()))
+		tflog.Trace(ctx, fmt.Sprintf("ref_obj: %+v", ref))
 
-		obj, err := repo.TagObject(ref.Hash())
-		if err != nil && !errors.Is(err, plumbing.ErrObjectNotFound) {
-			return err
-		}
-
-		if obj == nil {
-			return nil
-		}
-
-		if obj.Target.String() == head.Hash().String() {
+		if ref.Hash().String() == head.Hash().String() {
+			tflog.Trace(ctx, "HERE1")
 			data.HasTag = types.BoolValue(true)
 		}
+
 		return nil
 	}); err != nil {
 		resp.Diagnostics.AddError("unable to find tag for reference", err.Error())
@@ -249,8 +249,9 @@ func (d *GitRepository) Read(ctx context.Context, req datasource.ReadRequest, re
 	data.Semver = types.StringValue(*result)
 	data.Branch = types.StringValue(head.Name().String())
 	data.IsDirty = types.BoolValue(dirty)
-	data.IsTag = types.BoolValue(isTag)
+	data.IsTag = types.BoolValue(head.Name().IsTag())
 	data.IsBranch = types.BoolValue(head.Name().IsBranch())
+	data.IsRemote = types.BoolValue(head.Name().IsRemote())
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
